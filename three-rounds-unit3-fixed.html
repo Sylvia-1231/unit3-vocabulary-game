@@ -1,0 +1,1743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三轮抢答系统 - Unit 3（修复版）</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* 顶部栏 */
+        .top-bar {
+            background: white;
+            padding: 25px 40px;
+            border-radius: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .top-bar h1 {
+            color: #667eea;
+            font-size: 2.5em;
+        }
+
+        .round-indicator {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        /* 积分榜 */
+        .scoreboard {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .scoreboard h2 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 25px;
+            font-size: 2em;
+        }
+
+        .scores-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 20px;
+        }
+
+        .score-card {
+            text-align: center;
+            padding: 25px;
+            border-radius: 15px;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-top: 5px solid;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .score-card::before {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, transparent 70%);
+            transition: top 0.3s;
+        }
+
+        .score-card.flash::before {
+            animation: flash 0.5s;
+        }
+
+        @keyframes flash {
+            0%, 100% { top: -100%; }
+            50% { top: 0; }
+        }
+
+        .score-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        .score-card.team-1 { border-color: #e74c3c; }
+        .score-card.team-2 { border-color: #3498db; }
+        .score-card.team-3 { border-color: #2ecc71; }
+        .score-card.team-4 { border-color: #f39c12; }
+        .score-card.team-5 { border-color: #9b59b6; }
+
+        .team-name {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+
+        .team-score {
+            font-size: 3.5em;
+            font-weight: bold;
+            font-family: 'Arial Black', sans-serif;
+        }
+
+        .score-card.team-1 .team-score { color: #e74c3c; }
+        .score-card.team-2 .team-score { color: #3498db; }
+        .score-card.team-3 .team-score { color: #2ecc71; }
+        .score-card.team-4 .team-score { color: #f39c12; }
+        .score-card.team-5 .team-score { color: #9b59b6; }
+
+        /* 题目卡片 */
+        .question-card {
+            background: white;
+            padding: 50px;
+            border-radius: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+
+        .question-type {
+            font-size: 1.5em;
+            color: #7f8c8d;
+            margin-bottom: 20px;
+        }
+
+        .question-content {
+            font-size: 3em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 30px 0;
+            line-height: 1.5;
+        }
+
+        .blank-space {
+            color: #e74c3c;
+            border-bottom: 4px dashed #e74c3c;
+            padding: 0 30px;
+            display: inline-block;
+            min-width: 150px;
+        }
+
+        .question-hint {
+            font-size: 1.3em;
+            color: #95a5a6;
+            margin-top: 20px;
+        }
+
+        /* 中文释义 */
+        .chinese-meaning {
+            font-size: 1.8em;
+            color: #667eea;
+            background: #f0f4ff;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 25px 0;
+            font-weight: 500;
+        }
+
+        /* 抢答按钮组 */
+        .buzzer-buttons {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .buzzer-btn {
+            padding: 40px 20px;
+            border: none;
+            border-radius: 15px;
+            font-size: 2em;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .buzzer-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.5);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .buzzer-btn:active::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .buzzer-btn:hover {
+            transform: translateY(-8px) scale(1.05);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+        }
+
+        .buzzer-btn:active {
+            transform: translateY(-4px) scale(0.98);
+        }
+
+        .buzzer-btn.team-1 { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+        .buzzer-btn.team-2 { background: linear-gradient(135deg, #3498db, #2980b9); }
+        .buzzer-btn.team-3 { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+        .buzzer-btn.team-4 { background: linear-gradient(135deg, #f39c12, #e67e22); }
+        .buzzer-btn.team-5 { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+
+        /* AI讲解卡片 */
+        .explanation-card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            display: none;
+        }
+
+        .explanation-card.show {
+            display: block;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .explanation-card h3 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .vocab-details {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .word-header {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .pronunciation {
+            font-size: 1.5em;
+            color: #7f8c8d;
+            font-style: italic;
+            margin-bottom: 20px;
+        }
+
+        .meaning {
+            font-size: 1.8em;
+            color: #34495e;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+
+        .detail-section {
+            margin: 20px 0;
+        }
+
+        .detail-section h4 {
+            color: #667eea;
+            font-size: 1.5em;
+            margin-bottom: 15px;
+        }
+
+        .detail-section ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .detail-section li {
+            padding: 12px 20px;
+            background: white;
+            margin: 8px 0;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            font-size: 1.2em;
+            line-height: 1.6;
+        }
+
+        /* 翻译输入区 */
+        .translation-inputs {
+            display: grid;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .translation-group {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-left: 5px solid;
+        }
+
+        .translation-group.team-1 { border-color: #e74c3c; }
+        .translation-group.team-2 { border-color: #3498db; }
+        .translation-group.team-3 { border-color: #2ecc71; }
+        .translation-group.team-4 { border-color: #f39c12; }
+        .translation-group.team-5 { border-color: #9b59b6; }
+
+        .translation-group h4 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+
+        .translation-group textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ecf0f1;
+            border-radius: 10px;
+            font-size: 1.2em;
+            min-height: 100px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .translation-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        /* 评分结果 */
+        .scoring-results {
+            display: grid;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .result-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-left: 5px solid;
+        }
+
+        .result-card.team-1 { border-color: #e74c3c; }
+        .result-card.team-2 { border-color: #3498db; }
+        .result-card.team-3 { border-color: #2ecc71; }
+        .result-card.team-4 { border-color: #f39c12; }
+        .result-card.team-5 { border-color: #9b59b6; }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .result-team-name {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .result-score {
+            font-size: 2.5em;
+            font-weight: bold;
+        }
+
+        .result-card.team-1 .result-score { color: #e74c3c; }
+        .result-card.team-2 .result-score { color: #3498db; }
+        .result-card.team-3 .result-score { color: #2ecc71; }
+        .result-card.team-4 .result-score { color: #f39c12; }
+        .result-card.team-5 .result-score { color: #9b59b6; }
+
+        .result-translation {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-size: 1.2em;
+            font-style: italic;
+            color: #34495e;
+        }
+
+        .result-feedback {
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .result-feedback h5 {
+            color: #27ae60;
+            margin-bottom: 10px;
+        }
+
+        .result-feedback p {
+            color: #34495e;
+            line-height: 1.6;
+        }
+
+        /* 按钮 */
+        .btn {
+            padding: 18px 40px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.4em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: white;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #56ab2f, #a8e063);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f2994a, #f2c94c);
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        /* 设置面板 */
+        .setup-panel {
+            background: white;
+            padding: 50px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .setup-panel h2 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .team-inputs {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+        }
+
+        .team-input-wrapper {
+            text-align: center;
+        }
+
+        .team-input-wrapper label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        .team-input-wrapper input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ecf0f1;
+            border-radius: 10px;
+            font-size: 1.2em;
+        }
+
+        /* 加载动画 */
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loading.show {
+            display: flex;
+        }
+
+        .loading-content {
+            background: white;
+            padding: 50px;
+            border-radius: 20px;
+            text-align: center;
+        }
+
+        .spinner {
+            width: 80px;
+            height: 80px;
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 30px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 响应式 */
+        @media (max-width: 1200px) {
+            .scores-grid,
+            .buzzer-buttons,
+            .team-inputs {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .question-content {
+                font-size: 2.2em;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .scores-grid,
+            .buzzer-buttons,
+            .team-inputs {
+                grid-template-columns: 1fr;
+            }
+            .question-content {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 设置面板 -->
+        <div id="setupPanel" class="setup-panel">
+            <h2>🎮 三轮抢答系统 - Unit 3</h2>
+            
+            <div class="form-group">
+                <label>本单元包含16个词汇/短语</label>
+                <p style="text-align: center; color: #7f8c8d; font-size: 1.1em; margin-top: 10px;">
+                    第1轮：词汇抢答（10分/词） | 第2轮：观点句填空（15分/句） | 第3轮：观点句翻译（100分/句）
+                </p>
+            </div>
+
+            <div class="form-group">
+                <label>队伍名称设置：</label>
+                <div class="team-inputs">
+                    <div class="team-input-wrapper">
+                        <label style="color: #e74c3c;">第1组</label>
+                        <input type="text" id="team1Name" value="红队">
+                    </div>
+                    <div class="team-input-wrapper">
+                        <label style="color: #3498db;">第2组</label>
+                        <input type="text" id="team2Name" value="蓝队">
+                    </div>
+                    <div class="team-input-wrapper">
+                        <label style="color: #2ecc71;">第3组</label>
+                        <input type="text" id="team3Name" value="绿队">
+                    </div>
+                    <div class="team-input-wrapper">
+                        <label style="color: #f39c12;">第4组</label>
+                        <input type="text" id="team4Name" value="黄队">
+                    </div>
+                    <div class="team-input-wrapper">
+                        <label style="color: #9b59b6;">第5组</label>
+                        <input type="text" id="team5Name" value="紫队">
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="startGame()" style="width: 100%; margin-top: 30px; padding: 25px; font-size: 1.8em;">
+                🚀 开始游戏
+            </button>
+        </div>
+
+        <!-- 游戏区域 -->
+        <div id="gameArea" style="display: none;">
+            <!-- 顶部栏 -->
+            <div class="top-bar">
+                <h1>🎯 Unit 3 词汇挑战赛</h1>
+                <div class="round-indicator" id="roundIndicator">
+                    第一轮：词汇抢答
+                </div>
+            </div>
+
+            <!-- 积分榜 -->
+            <div class="scoreboard">
+                <h2>📊 实时积分榜</h2>
+                <div class="scores-grid" id="scoresGrid">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+
+            <!-- 题目显示 -->
+            <div class="question-card" id="questionCard">
+                <div class="question-type" id="questionType">词汇抢答</div>
+                <div class="question-content" id="questionContent">
+                    注意；关注
+                </div>
+                <div class="chinese-meaning" id="chineseMeaning" style="display: none;">
+                    <!-- 第二轮显示中文释义 -->
+                </div>
+                <div class="question-hint" id="questionHint">
+                    提示：9个字母
+                </div>
+            </div>
+
+            <!-- 抢答按钮（第一、二轮） -->
+            <div class="buzzer-buttons" id="buzzerButtons">
+                <!-- 动态生成 -->
+            </div>
+
+            <!-- 翻译输入区（第三轮） -->
+            <div class="translation-inputs" id="translationInputs" style="display: none;">
+                <!-- 动态生成 -->
+            </div>
+
+            <!-- AI讲解卡片 -->
+            <div class="explanation-card" id="explanationCard">
+                <!-- 动态生成 -->
+            </div>
+
+            <!-- 评分结果（第三轮） -->
+            <div class="scoring-results" id="scoringResults" style="display: none;">
+                <!-- 动态生成 -->
+            </div>
+
+            <!-- 控制按钮 -->
+            <div class="controls">
+                <button class="btn btn-success" id="nextBtn" onclick="nextQuestion()" style="display: none;">
+                    ▶️ 下一题
+                </button>
+                <button class="btn btn-warning" onclick="resetGame()">
+                    🔄 重新开始
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载动画 -->
+    <div class="loading" id="loading">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <h2>AI正在生成内容...</h2>
+        </div>
+    </div>
+
+    <script>
+        // ============ Unit 3 词汇数据（已修正第二轮挖空） ============
+        const UNIT3_VOCABULARY = [
+            {
+                word: 'attention',
+                pronunciation: '/əˈtenʃn/',
+                round1: {
+                    chinese: '注意；关注',
+                    answer: 'attention'
+                },
+                round2: {
+                    sentence: 'In today\'s digital age, many people find it increasingly difficult to pay _____ to a single task for an extended period.',
+                    chineseMeaning: '在当今数字时代，许多人发现越来越难以长时间专注于单一任务。',
+                    answer: 'attention'
+                },
+                round3: {
+                    chinese: '随着社交媒体的普及，人们的注意力持续时间显著缩短，这对学习和工作效率产生了负面影响。',
+                    reference: 'With the widespread use of social media, people\'s attention span has significantly decreased, which has negatively impacted learning and work efficiency.',
+                    keywords: ['attention span', 'social media', 'decreased', 'negatively impact', 'efficiency']
+                }
+            },
+            {
+                word: 'casualty',
+                pronunciation: '/ˈkæʒuəlti/',
+                round1: {
+                    chinese: '伤亡人员；受害者',
+                    answer: 'casualty'
+                },
+                round2: {
+                    sentence: 'Despite significant advancements in vehicle safety technology, traffic accidents continue to claim numerous _____ each year, highlighting the need for stricter regulations.',
+                    chineseMeaning: '尽管汽车安全技术取得了重大进展，但交通事故每年仍造成大量伤亡，这凸显了更严格监管的必要性。',
+                    answer: 'casualties'
+                },
+                round3: {
+                    chinese: '自然灾害不仅造成大量人员伤亡，还给经济发展带来严重影响，因此加强防灾减灾能力建设至关重要。',
+                    reference: 'Natural disasters not only result in numerous casualties but also severely impact economic development, making it crucial to strengthen disaster prevention and mitigation capabilities.',
+                    keywords: ['casualties', 'natural disasters', 'economic development', 'crucial', 'prevention', 'mitigation']
+                }
+            },
+            {
+                word: 'drown',
+                pronunciation: '/draʊn/',
+                round1: {
+                    chinese: '淹死；溺死；淹没',
+                    answer: 'drown'
+                },
+                round2: {
+                    sentence: 'In the modern workplace, employees often feel as though they are _____ in endless emails and meetings, which significantly reduces their productivity.',
+                    chineseMeaning: '在现代职场中，员工经常感觉自己淹没在无尽的邮件和会议中，这大大降低了他们的工作效率。',
+                    answer: 'drowning'
+                },
+                round3: {
+                    chinese: '许多学生被繁重的作业和考试压力所淹没，以至于失去了学习的乐趣和创造力。',
+                    reference: 'Many students are drowning in heavy homework and exam pressure to such an extent that they lose the joy of learning and creativity.',
+                    keywords: ['drown', 'homework', 'pressure', 'lose', 'creativity', 'joy of learning']
+                }
+            },
+            {
+                word: 'envious',
+                pronunciation: '/ˈenviəs/',
+                round1: {
+                    chinese: '羡慕的；嫉妒的',
+                    answer: 'envious'
+                },
+                round2: {
+                    sentence: 'Social media platforms often trigger _____ feelings among users as they constantly compare their lives with the carefully curated images posted by others.',
+                    chineseMeaning: '社交媒体平台经常在用户中引发嫉妒情绪，因为他们不断将自己的生活与他人精心策划的图片进行比较。',
+                    answer: 'envious'
+                },
+                round3: {
+                    chinese: '与其羡慕他人的成功，不如专注于自己的成长和进步，这才是实现个人价值的正确途径。',
+                    reference: 'Rather than being envious of others\' success, it is better to focus on one\'s own growth and progress, which is the right path to achieving personal value.',
+                    keywords: ['envious', 'success', 'focus on', 'growth', 'progress', 'personal value']
+                }
+            },
+            {
+                word: 'ignorant',
+                pronunciation: '/ˈɪɡnərənt/',
+                round1: {
+                    chinese: '无知的；不了解的',
+                    answer: 'ignorant'
+                },
+                round2: {
+                    sentence: 'Being _____ of cultural differences can lead to serious misunderstandings in international business negotiations, potentially damaging valuable partnerships.',
+                    chineseMeaning: '对文化差异的无知可能导致国际商务谈判中的严重误解，从而可能损害宝贵的合作关系。',
+                    answer: 'ignorant'
+                },
+                round3: {
+                    chinese: '在信息时代，对新技术保持无知是危险的，因为这会使个人在就业市场上失去竞争力。',
+                    reference: 'In the information age, remaining ignorant of new technologies is dangerous, as it will cause individuals to lose competitiveness in the job market.',
+                    keywords: ['ignorant', 'new technologies', 'information age', 'competitiveness', 'job market']
+                }
+            },
+            {
+                word: 'old-fashioned',
+                pronunciation: '/ˌəʊld ˈfæʃnd/',
+                round1: {
+                    chinese: '过时的；老式的',
+                    answer: 'old-fashioned'
+                },
+                round2: {
+                    sentence: 'While some may consider traditional teaching methods _____, research suggests that they can be highly effective when combined with modern technology.',
+                    chineseMeaning: '虽然有些人可能认为传统教学方法已经过时，但研究表明，当与现代技术相结合时，它们可以非常有效。',
+                    answer: 'old-fashioned'
+                },
+                round3: {
+                    chinese: '尽管电子书越来越流行，但许多读者仍然偏爱传统纸质书，认为它们提供了更好的阅读体验。',
+                    reference: 'Despite the growing popularity of e-books, many readers still prefer old-fashioned paper books, believing they provide a better reading experience.',
+                    keywords: ['old-fashioned', 'e-books', 'prefer', 'paper books', 'reading experience']
+                }
+            },
+            {
+                word: 'physician',
+                pronunciation: '/fɪˈzɪʃn/',
+                round1: {
+                    chinese: '医生；内科医生',
+                    answer: 'physician'
+                },
+                round2: {
+                    sentence: 'With the advancement of artificial intelligence, _____ can now diagnose diseases more accurately and efficiently, though human judgment remains irreplaceable.',
+                    chineseMeaning: '随着人工智能的进步，医生现在可以更准确、更高效地诊断疾病，尽管人类的判断力仍然不可替代。',
+                    answer: 'physicians'
+                },
+                round3: {
+                    chinese: '医生短缺已成为许多发展中国家面临的严重问题，这严重影响了医疗服务的质量和可及性。',
+                    reference: 'The shortage of physicians has become a serious problem facing many developing countries, which severely affects the quality and accessibility of healthcare services.',
+                    keywords: ['shortage', 'physicians', 'developing countries', 'healthcare services', 'accessibility']
+                }
+            },
+            {
+                word: 'prescription',
+                pronunciation: '/prɪˈskrɪpʃn/',
+                round1: {
+                    chinese: '处方；药方',
+                    answer: 'prescription'
+                },
+                round2: {
+                    sentence: 'The overuse of _____ drugs has become a growing concern, as many patients develop dependency without fully understanding the potential risks.',
+                    chineseMeaning: '处方药的过度使用已成为一个日益严重的问题，因为许多患者在没有充分了解潜在风险的情况下产生了依赖性。',
+                    answer: 'prescription'
+                },
+                round3: {
+                    chinese: '政府应该加强对处方药的监管，防止药物滥用，同时确保真正需要药物的患者能够获得治疗。',
+                    reference: 'The government should strengthen the regulation of prescription drugs to prevent drug abuse while ensuring that patients who genuinely need medication can access treatment.',
+                    keywords: ['prescription drugs', 'regulation', 'prevent', 'drug abuse', 'access', 'treatment']
+                }
+            },
+            {
+                word: 'slip',
+                pronunciation: '/slɪp/',
+                round1: {
+                    chinese: '滑倒；下滑',
+                    answer: 'slip'
+                },
+                round2: {
+                    sentence: 'Even the most successful companies can _____ from their leading positions if they fail to innovate and adapt to changing market conditions.',
+                    chineseMeaning: '即使是最成功的公司，如果不能创新和适应不断变化的市场条件，也会从领先地位上滑落。',
+                    answer: 'slip'
+                },
+                round3: {
+                    chinese: '学生的成绩可能会因为缺乏持续努力而迅速下滑，这提醒我们学习需要坚持不懈。',
+                    reference: 'Students\' grades may slip rapidly due to a lack of consistent effort, which reminds us that learning requires perseverance.',
+                    keywords: ['grades', 'slip', 'lack of effort', 'perseverance', 'consistent']
+                }
+            },
+            {
+                word: 'trend',
+                pronunciation: '/trend/',
+                round1: {
+                    chinese: '趋势；潮流',
+                    answer: 'trend'
+                },
+                round2: {
+                    sentence: 'The _____ toward remote work has fundamentally transformed the traditional office culture, offering both opportunities and challenges for organizations.',
+                    chineseMeaning: '远程工作的趋势从根本上改变了传统的办公室文化，为组织带来了机遇和挑战。',
+                    answer: 'trend'
+                },
+                round3: {
+                    chinese: '可持续发展已成为全球趋势，越来越多的企业开始重视环境保护和社会责任。',
+                    reference: 'Sustainable development has become a global trend, with an increasing number of companies beginning to emphasize environmental protection and social responsibility.',
+                    keywords: ['trend', 'sustainable development', 'environmental protection', 'social responsibility', 'companies']
+                }
+            },
+            {
+                word: 'be ignorant of/about',
+                pronunciation: '',
+                round1: {
+                    chinese: '对...无知；不了解',
+                    answer: 'be ignorant of/about'
+                },
+                round2: {
+                    sentence: 'Many young people _____ the historical events that shaped their nation, which may lead to a lack of appreciation for current freedoms.',
+                    chineseMeaning: '许多年轻人对塑造其国家的历史事件一无所知，这可能导致他们缺乏对当前自由的感激之情。',
+                    answer: 'are ignorant of'
+                },
+                round3: {
+                    chinese: '消费者不应该对自己购买的产品成分一无所知，而应该培养仔细阅读标签的习惯。',
+                    reference: 'Consumers should not be ignorant of the ingredients in the products they purchase, but rather develop the habit of carefully reading labels.',
+                    keywords: ['ignorant of', 'ingredients', 'consumers', 'develop the habit', 'reading labels']
+                }
+            },
+            {
+                word: 'get rid of',
+                pronunciation: '',
+                round1: {
+                    chinese: '摆脱；除掉',
+                    answer: 'get rid of'
+                },
+                round2: {
+                    sentence: 'To improve public health, governments must implement comprehensive strategies to help citizens _____ harmful habits such as smoking and excessive drinking.',
+                    chineseMeaning: '为了改善公共健康，政府必须实施综合策略，帮助公民摆脱吸烟和过度饮酒等有害习惯。',
+                    answer: 'get rid of'
+                },
+                round3: {
+                    chinese: '教育的目的不仅是传授知识，更重要的是帮助学生摆脱固有思维模式，培养批判性思维能力。',
+                    reference: 'The purpose of education is not only to impart knowledge, but more importantly, to help students get rid of fixed thinking patterns and develop critical thinking skills.',
+                    keywords: ['get rid of', 'education', 'fixed thinking patterns', 'critical thinking', 'develop']
+                }
+            },
+            {
+                word: 'take effect',
+                pronunciation: '',
+                round1: {
+                    chinese: '生效；起作用',
+                    answer: 'take effect'
+                },
+                round2: {
+                    sentence: 'New environmental regulations are expected to _____ next month, requiring all factories to significantly reduce their carbon emissions.',
+                    chineseMeaning: '新的环境法规预计将于下月生效，要求所有工厂大幅减少碳排放。',
+                    answer: 'take effect'
+                },
+                round3: {
+                    chinese: '教育改革往往需要较长时间才能见效，因此政策制定者应该保持耐心并持续评估其效果。',
+                    reference: 'Educational reforms often take a long time to take effect, so policymakers should remain patient and continuously evaluate their effectiveness.',
+                    keywords: ['take effect', 'educational reforms', 'policymakers', 'patient', 'evaluate', 'effectiveness']
+                }
+            },
+            {
+                word: 'take off',
+                pronunciation: '',
+                round1: {
+                    chinese: '起飞；脱掉；突然成功',
+                    answer: 'take off'
+                },
+                round2: {
+                    sentence: 'The green energy industry has finally begun to _____ in recent years, driven by technological innovations and increasing environmental awareness.',
+                    chineseMeaning: '近年来，在技术创新和环保意识增强的推动下，绿色能源产业终于开始腾飞。',
+                    answer: 'take off'
+                },
+                round3: {
+                    chinese: '电子商务在疫情期间迅速发展，彻底改变了人们的购物习惯和商业模式。',
+                    reference: 'E-commerce took off rapidly during the pandemic, fundamentally transforming people\'s shopping habits and business models.',
+                    keywords: ['take off', 'e-commerce', 'pandemic', 'transforming', 'shopping habits', 'business models']
+                }
+            },
+            {
+                word: 'spend ... (in) doing sth.',
+                pronunciation: '',
+                round1: {
+                    chinese: '花费(时间)做某事',
+                    answer: 'spend ... doing'
+                },
+                round2: {
+                    sentence: 'Research indicates that children who _____ excessive time playing video games may experience negative effects on their academic performance and social skills.',
+                    chineseMeaning: '研究表明，花费过多时间玩电子游戏的儿童可能会对其学业成绩和社交技能产生负面影响。',
+                    answer: 'spend ... playing'
+                },
+                round3: {
+                    chinese: '与其把时间花在抱怨问题上，不如积极寻找解决方案，这样才能真正实现个人成长。',
+                    reference: 'Rather than spending time complaining about problems, it is better to actively seek solutions, which is the only way to truly achieve personal growth.',
+                    keywords: ['spend time', 'complaining', 'seek solutions', 'personal growth', 'achieve']
+                }
+            },
+            {
+                word: 'make a crash-landing',
+                pronunciation: '',
+                round1: {
+                    chinese: '紧急迫降；硬着陆',
+                    answer: 'make a crash-landing'
+                },
+                round2: {
+                    sentence: 'When faced with unexpected economic crises, some businesses are forced to _____ by implementing drastic cost-cutting measures to survive.',
+                    chineseMeaning: '面对意外的经济危机时，一些企业被迫通过实施严厉的成本削减措施来紧急着陆以求生存。',
+                    answer: 'make a crash-landing'
+                },
+                round3: {
+                    chinese: '当原计划无法实施时，项目团队必须迅速调整策略，虽然可能不够完美，但能确保项目不会完全失败。',
+                    reference: 'When the original plan cannot be implemented, the project team must quickly adjust their strategy to make a crash-landing, which, though imperfect, ensures the project does not fail completely.',
+                    keywords: ['crash-landing', 'adjust strategy', 'original plan', 'imperfect', 'ensure', 'fail']
+                }
+            }
+        ];
+
+        // ============ 游戏状态 ============
+        let gameState = {
+            round: 1,
+            wordIndex: 0,
+            teams: [],
+            words: UNIT3_VOCABULARY,
+            currentWord: null,
+            showingExplanation: false
+        };
+
+        // ============ 音效生成 ============
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSuccessSound() {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+
+            setTimeout(() => {
+                const osc2 = audioContext.createOscillator();
+                const gain2 = audioContext.createGain();
+                
+                osc2.connect(gain2);
+                gain2.connect(audioContext.destination);
+                
+                osc2.frequency.value = 1000;
+                osc2.type = 'sine';
+                
+                gain2.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                
+                osc2.start(audioContext.currentTime);
+                osc2.stop(audioContext.currentTime + 0.2);
+            }, 100);
+        }
+
+        // ============ 开始游戏 ============
+        function startGame() {
+            gameState.teams = [];
+            for (let i = 1; i <= 5; i++) {
+                const name = document.getElementById(`team${i}Name`).value.trim() || `第${i}组`;
+                gameState.teams.push({
+                    id: i,
+                    name: name,
+                    score: 0
+                });
+            }
+
+            gameState.round = 1;
+            gameState.wordIndex = 0;
+            gameState.showingExplanation = false;
+
+            document.getElementById('setupPanel').style.display = 'none';
+            document.getElementById('gameArea').style.display = 'block';
+
+            initializeScoreboard();
+            initializeBuzzerButtons();
+            showQuestion();
+        }
+
+        // ============ 初始化积分榜 ============
+        function initializeScoreboard() {
+            const container = document.getElementById('scoresGrid');
+            container.innerHTML = '';
+
+            gameState.teams.forEach((team, index) => {
+                const card = document.createElement('div');
+                card.className = `score-card team-${team.id}`;
+                card.innerHTML = `
+                    <div class="team-name">${team.name}</div>
+                    <div class="team-score" id="score${team.id}">0</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // ============ 初始化抢答按钮 ============
+        function initializeBuzzerButtons() {
+            const container = document.getElementById('buzzerButtons');
+            container.innerHTML = '';
+
+            gameState.teams.forEach(team => {
+                const btn = document.createElement('button');
+                btn.className = `buzzer-btn team-${team.id}`;
+                btn.textContent = team.name;
+                btn.onclick = () => teamAnswered(team.id);
+                container.appendChild(btn);
+            });
+        }
+
+        // ============ 显示题目 ============
+        function showQuestion() {
+            gameState.currentWord = gameState.words[gameState.wordIndex];
+            gameState.showingExplanation = false;
+
+            document.getElementById('explanationCard').classList.remove('show');
+            document.getElementById('scoringResults').style.display = 'none';
+            document.getElementById('nextBtn').style.display = 'none';
+            document.getElementById('chineseMeaning').style.display = 'none';
+
+            const roundNames = ['词汇抢答', '观点句填空', '观点句翻译'];
+            document.getElementById('roundIndicator').textContent = 
+                `第${gameState.round}轮：${roundNames[gameState.round - 1]}`;
+            
+            document.getElementById('questionType').textContent = roundNames[gameState.round - 1];
+
+            if (gameState.round === 1) {
+                showRound1();
+            } else if (gameState.round === 2) {
+                showRound2();
+            } else if (gameState.round === 3) {
+                showRound3();
+            }
+        }
+
+        // ============ 第一轮：词汇抢答 ============
+        function showRound1() {
+            const word = gameState.currentWord;
+            
+            document.getElementById('questionContent').textContent = word.round1.chinese;
+            document.getElementById('questionHint').textContent = `提示：${word.word.replace(/ /g, '').length}个字母${word.word.includes(' ') || word.word.includes('/') ? '（可能含空格或符号）' : ''}`;
+            
+            document.getElementById('buzzerButtons').style.display = 'grid';
+            document.getElementById('translationInputs').style.display = 'none';
+        }
+
+        // ============ 第二轮：观点句填空（修复版） ============
+        function showRound2() {
+            const word = gameState.currentWord;
+            
+            // 将句子中的 _____ 替换为带样式的空格
+            const displaySentence = word.round2.sentence.replace(/_____/g, '<span class="blank-space">_____</span>');
+            
+            document.getElementById('questionContent').innerHTML = displaySentence;
+            
+            // 显示中文释义
+            const meaningDiv = document.getElementById('chineseMeaning');
+            meaningDiv.textContent = '📖 ' + word.round2.chineseMeaning;
+            meaningDiv.style.display = 'block';
+            
+            document.getElementById('questionHint').textContent = '请说出空格处应填的词汇（需注意词形变化）';
+            
+            document.getElementById('buzzerButtons').style.display = 'grid';
+            document.getElementById('translationInputs').style.display = 'none';
+        }
+
+        // ============ 第三轮：观点句翻译 ============
+        function showRound3() {
+            const word = gameState.currentWord;
+            
+            document.getElementById('questionContent').textContent = word.round3.chinese;
+            document.getElementById('questionHint').textContent = '各组请在纸上写出翻译（符合四六级高分标准），老师输入后AI评分（满分100分）';
+            
+            document.getElementById('buzzerButtons').style.display = 'none';
+            document.getElementById('translationInputs').style.display = 'grid';
+
+            const container = document.getElementById('translationInputs');
+            container.innerHTML = '';
+
+            gameState.teams.forEach(team => {
+                const group = document.createElement('div');
+                group.className = `translation-group team-${team.id}`;
+                group.innerHTML = `
+                    <h4>${team.name}的翻译：</h4>
+                    <textarea id="translation${team.id}" placeholder="请输入该组的翻译..."></textarea>
+                `;
+                container.appendChild(group);
+            });
+
+            const controls = document.createElement('div');
+            controls.className = 'controls';
+            controls.innerHTML = `
+                <button class="btn btn-success" onclick="evaluateTranslations()" style="font-size: 1.8em; padding: 25px 50px;">
+                    🤖 AI评分（满分100）
+                </button>
+            `;
+            container.appendChild(controls);
+        }
+
+        // ============ 队伍答对（第一、二轮） ============
+        function teamAnswered(teamId) {
+            playSuccessSound();
+
+            const points = gameState.round === 1 ? 10 : 15;
+            const team = gameState.teams.find(t => t.id === teamId);
+            team.score += points;
+
+            const scoreCard = document.querySelector(`.score-card.team-${teamId}`);
+            scoreCard.classList.add('flash');
+            setTimeout(() => scoreCard.classList.remove('flash'), 500);
+
+            document.getElementById(`score${teamId}`).textContent = team.score;
+
+            showExplanation();
+        }
+
+        // ============ 显示AI讲解 ============
+        async function showExplanation() {
+            gameState.showingExplanation = true;
+            
+            document.getElementById('loading').classList.add('show');
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            const word = gameState.currentWord;
+            const card = document.getElementById('explanationCard');
+
+            if (gameState.round === 1) {
+                card.innerHTML = generateVocabExplanation(word);
+            } else if (gameState.round === 2) {
+                card.innerHTML = generateSentenceExplanation(word);
+            }
+
+            document.getElementById('loading').classList.remove('show');
+            card.classList.add('show');
+            document.getElementById('nextBtn').style.display = 'inline-block';
+        }
+
+        // ============ 生成词汇讲解 ============
+        function generateVocabExplanation(word) {
+            return `
+                <h3>📚 词汇详解</h3>
+                <div class="vocab-details">
+                    <div class="word-header">${word.word}</div>
+                    ${word.pronunciation ? `<div class="pronunciation">${word.pronunciation}</div>` : ''}
+                    <div class="meaning">💡 ${word.round1.chinese}</div>
+                    
+                    <div class="detail-section">
+                        <h4>📖 四六级常用搭配</h4>
+                        <ul>
+                            ${generateCollocations(word.word).map(c => `<li>${c}</li>`).join('')}
+                        </ul>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4>✍️ 写作应用场景</h4>
+                        <ul>
+                            ${generateWritingScenarios(word.word).map(s => `<li>${s}</li>`).join('')}
+                        </ul>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4>⚠️ 注意事项</h4>
+                        <ul>
+                            ${generateUsageNotes(word.word).map(n => `<li>${n}</li>`).join('')}
+                        </ul>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ============ 生成例句分析（修复版 - 针对具体句子） ============
+        function generateSentenceExplanation(word) {
+            const fullSentence = word.round2.sentence.replace(/_____/g, `<strong style="color: #667eea; font-size: 1.1em;">${word.round2.answer}</strong>`);
+            
+            return `
+                <h3>✅ 完整观点句与分析</h3>
+                <div class="vocab-details">
+                    <div class="meaning" style="font-size: 1.3em; line-height: 1.6;">
+                        ${fullSentence}
+                    </div>
+
+                    <div class="meaning" style="background: #f0f4ff; margin-top: 15px;">
+                        📖 ${word.round2.chineseMeaning}
+                    </div>
+
+                    <div class="detail-section">
+                        <h4>🎯 高分表达亮点</h4>
+                        <ul>
+                            ${analyzeHighlights(word.round2.sentence).map(h => `<li>${h}</li>`).join('')}
+                        </ul>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4>📝 本句句型结构分析</h4>
+                        <ul>
+                            ${analyzeSentencePatterns(word.round2.sentence).map(p => `<li>${p}</li>`).join('')}
+                        </ul>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4>💡 可替换的同义表达</h4>
+                        <ul>
+                            ${generateAlternatives(word.word).map(a => `<li>${a}</li>`).join('')}
+                        </ul>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ============ 分析句子中的句型结构（新增函数） ============
+        function analyzeSentencePatterns(sentence) {
+            const patterns = [];
+            const lowerSentence = sentence.toLowerCase();
+
+            // 检测定语从句
+            if (sentence.match(/which|that(?!\s+is\s+why)|who/i)) {
+                const match = sentence.match(/(.*?)(which|that|who)(.*?)([,.])/i);
+                if (match) {
+                    patterns.push(`<strong>定语从句</strong>：使用了"${match[2]}"引导定语从句，增加句子信息量<br>例：..., which/who/that + 从句`);
+                }
+            }
+
+            // 检测让步状语从句
+            if (lowerSentence.includes('despite') || lowerSentence.includes('although') || lowerSentence.includes('while') || lowerSentence.includes('though')) {
+                const connector = lowerSentence.includes('despite') ? 'despite' : 
+                                 lowerSentence.includes('although') ? 'although' :
+                                 lowerSentence.includes('while') ? 'while' : 'though';
+                patterns.push(`<strong>让步状语</strong>：使用"${connector}"表达转折关系<br>例：Despite/Although + 让步内容, 主句`);
+            }
+
+            // 检测非谓语动词
+            if (sentence.match(/,\s*\w+ing\s/)) {
+                const match = sentence.match(/,\s*(\w+ing\s+[^,]+)/);
+                if (match) {
+                    patterns.push(`<strong>现在分词作状语</strong>："${match[1]}"作伴随/结果状语<br>例：主句, doing sth.（表示伴随或结果）`);
+                }
+            }
+
+            // 检测not only...but also
+            if (lowerSentence.includes('not only') && lowerSentence.includes('but also')) {
+                patterns.push(`<strong>并列结构</strong>：not only...but also 强调递进关系<br>例：sth. not only A but also B`);
+            }
+
+            // 检测it is...that强调句
+            if (sentence.match(/it\s+is.*?that/i)) {
+                patterns.push(`<strong>强调句型</strong>：It is...that 结构突出强调内容<br>例：It is + 被强调部分 + that + 其他`);
+            }
+
+            // 检测to do不定式作状语
+            if (sentence.match(/to\s+\w+.*?,/)) {
+                patterns.push(`<strong>不定式作目的状语</strong>：To do sth., 主句<br>例：To improve..., governments must...`);
+            }
+
+            // 检测as引导的从句
+            if (lowerSentence.includes(' as ') && sentence.match(/as\s+\w+.*?[,]/)) {
+                patterns.push(`<strong>as引导的从句</strong>：表示"随着"或"因为"<br>例：As + 从句, 主句`);
+            }
+
+            // 检测with结构
+            if (sentence.match(/with\s+the/i)) {
+                patterns.push(`<strong>with介词短语</strong>：With the + 名词，作原因或伴随状语<br>例：With the advancement of..., ...`);
+            }
+
+            // 检测被动语态
+            if (sentence.match(/is|are|was|were|be|been\s+\w+(ed|en)\s/)) {
+                patterns.push(`<strong>被动语态</strong>：be + 过去分词，突出动作承受者<br>例：主语 + be expected/required/forced to do`);
+            }
+
+            // 如果没有检测到特殊句型，给出基础说明
+            if (patterns.length === 0) {
+                patterns.push('本句使用主谓宾基本句型，结构清晰明了');
+                patterns.push('可以尝试加入定语从句或状语从句增加复杂度');
+            }
+
+            return patterns;
+        }
+
+        // ============ 评估翻译（第三轮） ============
+        async function evaluateTranslations() {
+            const translations = {};
+            gameState.teams.forEach(team => {
+                const textarea = document.getElementById(`translation${team.id}`);
+                translations[team.id] = textarea.value.trim() || '未作答';
+            });
+
+            document.getElementById('loading').classList.add('show');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            const word = gameState.currentWord;
+            const results = [];
+
+            gameState.teams.forEach(team => {
+                const translation = translations[team.id];
+                const evaluation = evaluateTranslation(translation, word.round3);
+                
+                team.score += evaluation.score;
+                document.getElementById(`score${team.id}`).textContent = team.score;
+
+                results.push({
+                    teamId: team.id,
+                    teamName: team.name,
+                    translation: translation,
+                    score: evaluation.score,
+                    feedback: evaluation.feedback
+                });
+            });
+
+            document.getElementById('loading').classList.remove('show');
+            displayTranslationResults(results, word);
+        }
+
+        // ============ 评分翻译（满分100） ============
+        function evaluateTranslation(translation, round3Data) {
+            if (translation === '未作答') {
+                return {
+                    score: 0,
+                    feedback: {
+                        strengths: [],
+                        weaknesses: ['未提交答案'],
+                        suggestions: ['请在规定时间内完成翻译'],
+                        reference: round3Data.reference
+                    }
+                };
+            }
+
+            let score = 0;
+            const strengths = [];
+            const weaknesses = [];
+            const suggestions = [];
+
+            // 1. 关键词检查（40分）
+            const keywordScore = checkKeywords(translation, round3Data.keywords);
+            score += keywordScore;
+            
+            if (keywordScore >= 30) {
+                strengths.push('关键词汇使用准确');
+            } else if (keywordScore >= 20) {
+                weaknesses.push('部分关键词缺失');
+                suggestions.push('建议包含：' + round3Data.keywords.join(', '));
+            } else {
+                weaknesses.push('关键词汇使用不足');
+                suggestions.push('必须包含：' + round3Data.keywords.slice(0, 3).join(', '));
+            }
+
+            // 2. 语法结构（30分）
+            const grammarScore = checkGrammar(translation);
+            score += grammarScore;
+            
+            if (grammarScore >= 25) {
+                strengths.push('语法结构正确，句式复杂');
+            } else if (grammarScore >= 15) {
+                suggestions.push('可使用定语从句、非谓语等复杂句式');
+            } else {
+                weaknesses.push('语法结构需改进');
+                suggestions.push('注意主谓一致、时态和冠词');
+            }
+
+            // 3. 表达地道性（20分）
+            const idiomScore = checkIdiomaticExpression(translation);
+            score += idiomScore;
+            
+            if (idiomScore >= 15) {
+                strengths.push('表达地道自然');
+            } else {
+                suggestions.push('避免中式英语，参考native表达');
+            }
+
+            // 4. 逻辑连贯性（10分）
+            const coherenceScore = checkCoherence(translation);
+            score += coherenceScore;
+            
+            if (coherenceScore >= 8) {
+                strengths.push('逻辑连贯，层次清晰');
+            }
+
+            return {
+                score: Math.min(100, score),
+                feedback: {
+                    strengths,
+                    weaknesses,
+                    suggestions,
+                    reference: round3Data.reference
+                }
+            };
+        }
+
+        function checkKeywords(translation, keywords) {
+            let score = 0;
+            const lowerTrans = translation.toLowerCase();
+            
+            keywords.forEach(keyword => {
+                if (lowerTrans.includes(keyword.toLowerCase())) {
+                    score += 40 / keywords.length;
+                }
+            });
+            
+            return Math.round(score);
+        }
+
+        function checkGrammar(translation) {
+            let score = 20;
+            
+            const wordCount = translation.split(/\s+/).length;
+            if (wordCount >= 15 && wordCount <= 30) score += 5;
+            if (translation.match(/^[A-Z]/)) score += 2;
+            if (translation.match(/[.!?]$/)) score += 3;
+            
+            return score;
+        }
+
+        function checkIdiomaticExpression(translation) {
+            let score = 10;
+            
+            const advancedConnectors = ['however', 'moreover', 'furthermore', 'nevertheless', 'consequently', 'thus', 'therefore'];
+            if (advancedConnectors.some(conn => translation.toLowerCase().includes(conn))) {
+                score += 5;
+            }
+            
+            if (translation.includes('which') || translation.includes('that') || translation.includes('who')) {
+                score += 5;
+            }
+            
+            return score;
+        }
+
+        function checkCoherence(translation) {
+            return 8;
+        }
+
+        // ============ 显示翻译结果 ============
+        function displayTranslationResults(results, word) {
+            const container = document.getElementById('scoringResults');
+            container.innerHTML = '';
+            container.style.display = 'grid';
+
+            results.sort((a, b) => b.score - a.score);
+
+            results.forEach((result, index) => {
+                const card = document.createElement('div');
+                card.className = `result-card team-${result.teamId}`;
+
+                const stars = '⭐'.repeat(Math.ceil(result.score / 20));
+
+                card.innerHTML = `
+                    <div class="result-header">
+                        <div class="result-team-name">
+                            ${index === 0 ? '🥇 ' : index === 1 ? '🥈 ' : index === 2 ? '🥉 ' : ''}
+                            ${result.teamName}
+                        </div>
+                        <div class="result-score">${result.score}/100分 ${stars}</div>
+                    </div>
+
+                    <div class="result-translation">
+                        "${result.translation}"
+                    </div>
+
+                    <div class="result-feedback">
+                        ${result.feedback.strengths.length > 0 ? `
+                            <h5>✅ 优点：</h5>
+                            <p>${result.feedback.strengths.join('；')}</p>
+                        ` : ''}
+
+                        ${result.feedback.weaknesses.length > 0 ? `
+                            <h5 style="color: #e74c3c;">⚠️ 需改进：</h5>
+                            <p>${result.feedback.weaknesses.join('；')}</p>
+                        ` : ''}
+
+                        ${result.feedback.suggestions.length > 0 ? `
+                            <h5 style="color: #f39c12;">💡 建议：</h5>
+                            <p>${result.feedback.suggestions.join('；')}</p>
+                        ` : ''}
+
+                        <h5 style="color: #3498db;">📖 参考译文：</h5>
+                        <p style="font-style: italic; background: #f0f4ff; padding: 10px; border-radius: 5px;">
+                            ${result.feedback.reference}
+                        </p>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+
+            document.getElementById('nextBtn').style.display = 'inline-block';
+        }
+
+        // ============ 辅助函数 ============
+        function generateCollocations(word) {
+            const collocations = {
+                'attention': ['pay attention to 注意', 'draw/attract attention 吸引注意', 'attention span 注意力持续时间', 'full attention 全神贯注'],
+                'casualty': ['casualties of war 战争伤亡', 'heavy casualties 重大伤亡', 'avoid casualties 避免伤亡', 'civilian casualties 平民伤亡'],
+                'drown': ['drown in work 埋头工作', 'be drowned in 沉浸于', 'drowning in debt 债台高筑', 'drown out 淹没（声音）'],
+                'envious': ['be envious of 羡慕/嫉妒', 'envious feelings 嫉妒情绪', 'envious eyes 羡慕的目光'],
+                'ignorant': ['be ignorant of/about 对...无知', 'remain ignorant 保持无知', 'ignorant people 无知的人'],
+                'old-fashioned': ['old-fashioned ideas 过时的想法', 'old-fashioned way 传统方式', 'old-fashioned values 传统价值观'],
+                'physician': ['consult a physician 咨询医生', 'family physician 家庭医生', 'licensed physician 持证医生'],
+                'prescription': ['prescription drugs 处方药', 'write a prescription 开处方', 'fill a prescription 配药'],
+                'slip': ['slip from 从...滑落', 'slip away 溜走', 'let slip 无意中说出', 'slip up 犯错'],
+                'trend': ['current trend 当前趋势', 'trend toward 趋向于', 'follow the trend 跟随潮流', 'set a trend 引领潮流']
+            };
+            return collocations[word] || ['常用于正式写作', '适合学术场景'];
+        }
+
+        function generateWritingScenarios(word) {
+            const scenarios = {
+                'attention': ['教育类：注意力与学习效率的关系', '科技类：社交媒体对注意力的影响', '工作类：专注力在职场的重要性'],
+                'casualty': ['社会类：灾害与安全问题', '战争类：和平的重要性', '健康类：交通事故预防'],
+                'drown': ['压力类：现代人的工作压力', '时间管理类：如何应对繁忙', '心理健康类：避免被负面情绪淹没'],
+                'envious': ['社会心理类：攀比现象分析', '教育类：培养正确价值观', '社交媒体类：虚拟世界的影响'],
+                'ignorant': ['教育类：知识的重要性', '文化类：了解文化差异', '职场类：持续学习的必要性'],
+                'old-fashioned': ['科技类：传统与创新的平衡', '教育类：传统教学法的价值', '文化类：传统文化的传承'],
+                'physician': ['医疗类：医患关系探讨', '健康类：预防保健', '科技类：AI在医疗中的应用'],
+                'prescription': ['医疗类：药品使用安全', '健康类：药物滥用问题', '监管类：药品管理政策'],
+                'slip': ['教育类：学习成绩波动', '职场类：竞争力维持', '经济类：市场地位变化'],
+                'trend': ['社会类：流行趋势分析', '科技类：发展方向预测', '环境类：可持续发展趋势']
+            };
+            return scenarios[word] || ['适用于议论文写作', '可用于描述社会现象'];
+        }
+
+        function generateUsageNotes(word) {
+            const notes = {
+                'attention': ['pay attention后接to，不接on', 'attention是不可数名词', 'attract/draw attention表示"吸引注意"'],
+                'casualty': ['通常用复数形式casualties', '指战争、灾害等的伤亡者', '区别于victim（受害者，范围更广）'],
+                'drown': ['过去式和过去分词均为drowned', '可用于比喻义：被...淹没', 'drown oneself in = immerse oneself in'],
+                'envious': ['后接of，不接about', '区别于jealous（嫉妒程度更强）', '可以是中性或贬义，视语境而定'],
+                'ignorant': ['后接of或about', '不要拼成ignorent', '可用completely/totally等副词修饰'],
+                'old-fashioned': ['注意有连字符', '可作表语或定语', '贬义、中性或褒义，取决于语境'],
+                'physician': ['正式用语，指内科医生', '美式英语中更常用', '区别于surgeon（外科医生）'],
+                'prescription': ['可数名词', '常与drug, medicine搭配', '动词形式为prescribe'],
+                'slip': ['基本义为"滑动"', '引申义：下降、衰退、疏忽', '过去式和过去分词为slipped'],
+                'trend': ['常与toward/towards搭配', 'current/recent修饰表示当前趋势', '也可作动词，表示"趋向"']
+            };
+            return notes[word] || ['注意词性变化', '注意拼写'];
+        }
+
+        function analyzeHighlights(sentence) {
+            const highlights = [];
+            
+            if (sentence.includes('increasingly')) highlights.push('"increasingly" - 高级副词，表示"日益"，体现变化趋势');
+            if (sentence.includes('significantly')) highlights.push('"significantly" - 学术词汇，表示"显著地"，增强程度');
+            if (sentence.includes('comprehensive')) highlights.push('"comprehensive" - 正式用语，表示"全面的"');
+            if (sentence.includes('fundamental')) highlights.push('"fundamentally" - 表示"根本地"，强调深层影响');
+            if (sentence.includes('numerous')) highlights.push('"numerous" - 替代many，更正式');
+            if (sentence.includes('excessive')) highlights.push('"excessive" - 表示"过度的"，比too much更学术');
+            if (sentence.match(/which|that|who/)) highlights.push('使用定语从句，增加信息密度');
+            if (sentence.match(/despite|although|while|though/i)) highlights.push('使用让步状语，逻辑严谨');
+            if (sentence.match(/,\s*\w+ing\s/)) highlights.push('使用分词结构，句式灵活');
+            
+            if (highlights.length === 0) {
+                highlights.push('句式结构完整，表达清晰');
+            }
+            
+            return highlights;
+        }
+
+        function generateAlternatives(word) {
+            const alternatives = {
+                'attention': ['focus 关注', 'concentration 专注', 'notice 注意', 'awareness 意识'],
+                'casualties': ['victims 受害者', 'fatalities 死亡人数', 'injuries 受伤人员', 'deaths 死亡'],
+                'drowning': ['overwhelmed 不堪重负', 'swamped 应接不暇', 'buried 埋头于', 'flooded 充斥'],
+                'envious': ['jealous 嫉妒的', 'covetous 贪婪的', 'resentful 不满的'],
+                'ignorant': ['unaware 不知道的', 'uninformed 不了解的', 'oblivious 未察觉的', 'clueless 毫无概念的'],
+                'old-fashioned': ['traditional 传统的', 'conventional 常规的', 'outdated 过时的', 'obsolete 淘汰的'],
+                'physicians': ['doctors 医生', 'medical practitioners 医疗从业者', 'clinicians 临床医生'],
+                'prescription': ['medication 药物治疗', 'medicine 药品', 'drug 药物'],
+                'slip': ['decline 下降', 'fall 跌落', 'drop 降低', 'slide 滑落'],
+                'trend': ['tendency 倾向', 'movement 运动/趋势', 'direction 方向', 'pattern 模式']
+            };
+            return alternatives[word] || ['根据语境选择同义词'];
+        }
+
+        // ============ 下一题 ============
+        function nextQuestion() {
+            gameState.wordIndex++;
+
+            if (gameState.wordIndex >= gameState.words.length) {
+                if (gameState.round < 3) {
+                    gameState.round++;
+                    gameState.wordIndex = 0;
+                    showQuestion();
+                } else {
+                    showFinalResults();
+                }
+            } else {
+                showQuestion();
+            }
+        }
+
+        // ============ 最终结果 ============
+        function showFinalResults() {
+            const sortedTeams = [...gameState.teams].sort((a, b) => b.score - a.score);
+
+            let html = `
+                <div style="text-align: center; padding: 50px;">
+                    <h1 style="font-size: 4em; color: white; margin-bottom: 30px;">
+                        🏆 游戏结束！
+                    </h1>
+                </div>
+            `;
+
+            const container = document.getElementById('gameArea');
+            container.innerHTML = html;
+
+            const resultsCard = document.createElement('div');
+            resultsCard.className = 'scoreboard';
+            resultsCard.innerHTML = `
+                <h2 style="font-size: 3em; margin-bottom: 40px;">🏅 最终排名</h2>
+                <div style="max-width: 800px; margin: 0 auto;">
+                    ${sortedTeams.map((team, index) => `
+                        <div style="display: flex; justify-content: space-between; align-items: center;
+                                    padding: 30px; margin: 20px 0; background: white;
+                                    border-radius: 15px; border-left: 8px solid;
+                                    border-color: ${['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6'][team.id-1]};
+                                    box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+                            <div style="display: flex; align-items: center; gap: 20px;">
+                                <div style="font-size: 3em;">
+                                    ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index+1}`}
+                                </div>
+                                <div>
+                                    <div style="font-size: 2em; font-weight: bold; color: #2c3e50;">
+                                        ${team.name}
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="font-size: 3em; font-weight: bold; 
+                                        color: ${['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6'][team.id-1]};">
+                                ${team.score}分
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="controls" style="margin-top: 50px;">
+                    <button class="btn btn-primary" onclick="location.reload()" 
+                            style="font-size: 1.8em; padding: 25px 50px;">
+                        🔄 重新开始
+                    </button>
+                </div>
+            `;
+
+            container.appendChild(resultsCard);
+        }
+
+        // ============ 重新开始 ============
+        function resetGame() {
+            if (confirm('确定要重新开始吗？当前进度将丢失。')) {
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
